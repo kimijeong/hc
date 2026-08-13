@@ -179,6 +179,10 @@
   .legend .row{ display:flex; align-items:center; gap:6px; margin-bottom:3px; }
   .legend .sw{ width:10px; height:10px; border-radius:50%; }
 
+  .river-marker-label{
+    font-size:10px; font-weight:700; color:var(--text-primary); background:rgba(255,255,255,0.92);
+    padding:1px 6px; border-radius:4px; white-space:nowrap; box-shadow:0 1px 3px rgba(0,0,0,0.18);
+  }
   .river-marker{
     position:relative; width:22px; height:22px; border-radius:50%; border:3px solid #fff;
     box-shadow:0 1px 4px rgba(0,0,0,0.35); cursor:pointer;
@@ -1163,15 +1167,30 @@ function initMap(){
 }
 
 function addRiverMarker(r){
+  const wrap = document.createElement('div');
+  wrap.style.display = 'flex';
+  wrap.style.flexDirection = 'column';
+  wrap.style.alignItems = 'center';
+  wrap.style.gap = '3px';
+  wrap.style.cursor = 'pointer';
+  wrap.title = `${r.name} (${r.actualGrade}등급)`;
+  wrap.addEventListener('click', ()=> openDetail(r.id));
+
+  const label = document.createElement('div');
+  label.className = 'river-marker-label';
+  label.textContent = r.name;
+
   const el = document.createElement('div');
   const pulseTier = { IV:'pulse-1', V:'pulse-2', VI:'pulse-3' }[r.actualGrade];
   el.className = 'river-marker' + (pulseTier ? ' ' + pulseTier : '');
   el.style.background = GRADE_COLOR[r.actualGrade];
   el.style.color = GRADE_COLOR[r.actualGrade];
-  el.title = `${r.name} (${r.actualGrade}등급)`;
-  el.addEventListener('click', ()=> openDetail(r.id));
+
+  wrap.appendChild(label);
+  wrap.appendChild(el);
+
   new kakao.maps.CustomOverlay({
-    map, position: new kakao.maps.LatLng(r.lat, r.lng), content: el, yAnchor: 0.5
+    map, position: new kakao.maps.LatLng(r.lat, r.lng), content: wrap, yAnchor: 1
   });
 }
 
@@ -1273,7 +1292,18 @@ document.getElementById('reportForm').addEventListener('submit', async e=>{
   }
 });
 
-document.getElementById('communityFilter').addEventListener('change', renderReportFeed);
+document.getElementById('communityFilter').addEventListener('change', e=>{
+  renderReportFeed();
+  const riverId = e.target.value;
+  if(riverId !== 'all' && mapReady){
+    const river = RIVERS.find(r=>r.id===riverId);
+    if(river){
+      const pos = new kakao.maps.LatLng(river.lat, river.lng);
+      map.panTo(pos);
+      setTimeout(()=> map.setLevel(4, { anchor: pos, animate: { duration: 500 } }), 250);
+    }
+  }
+});
 
 initTabs();
 renderRiverList();
