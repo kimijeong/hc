@@ -1,0 +1,13 @@
+{
+  "name": "bever",
+  "version": "1.0.0",
+  "private": true,
+  "description": "BEVER - Busan river water quality dashboard",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "@vercel/kv": "^2.0.0"
+  }
+}

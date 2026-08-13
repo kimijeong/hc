@@ -114,6 +114,8 @@
     resize:vertical;
   }
   #reportForm textarea{ min-height:56px; }
+  #reportForm input[type="file"]{ font-size:12px; }
+  #reportPhotoPreview{ margin-top:6px; max-width:100%; max-height:140px; border-radius:6px; border:1px solid var(--border); object-fit:cover; }
   #reportForm button{
     margin-top:2px; padding:9px; border:none; border-radius:6px;
     background: var(--blue); color:#fff; font-weight:700; font-size:13px; cursor:pointer;
@@ -127,6 +129,7 @@
   .report-item .rf-time{ color: var(--text-muted); font-weight:400; }
   .report-item .rf-symptom{ display:inline-block; margin-top:3px; font-size:11px; padding:1px 6px; border-radius:999px; background:#fdecea; color:var(--critical); font-weight:700; }
   .report-item .rf-comment{ margin-top:4px; color:var(--text-secondary); }
+  .report-item .rf-photo{ margin-top:6px; width:100%; max-height:120px; object-fit:cover; border-radius:6px; display:block; cursor:pointer; }
   .report-empty{ font-size:12px; color:var(--text-muted); padding:8px 0; }
 
   .tab-bar{ display:flex; border-bottom:1px solid var(--border); }
@@ -346,7 +349,11 @@
           <label>상세 내용
             <textarea id="reportComment" maxlength="200" placeholder="본 것을 알려주세요 (선택)"></textarea>
           </label>
-          <button type="submit">제보 등록</button>
+          <label>증거 사진 (선택)
+            <input type="file" id="reportPhoto" accept="image/*" capture="environment">
+            <img id="reportPhotoPreview" style="display:none;">
+          </label>
+          <button type="submit" id="reportSubmitBtn">제보 등록</button>
         </form>
         <div id="reportFeed" class="report-feed"></div>
       </div>
@@ -639,38 +646,84 @@ async function runAiDiagnosis(r){
 }
 
 /* ---------------------------------------------------------
-   Reports (localStorage)
+   Reports (shared via server — Vercel KV, localStorage as offline cache)
 --------------------------------------------------------- */
-const REPORT_KEY = 'busan-river-reports';
-function loadReports(){
-  try{ return JSON.parse(localStorage.getItem(REPORT_KEY)) || []; }catch(e){ return []; }
+const REPORT_CACHE_KEY = 'busan-river-reports-cache';
+function loadCachedReports(){
+  try{ return JSON.parse(localStorage.getItem(REPORT_CACHE_KEY)) || []; }catch(e){ return []; }
 }
-function saveReports(list){ localStorage.setItem(REPORT_KEY, JSON.stringify(list)); }
-let reports = loadReports();
+function cacheReports(list){
+  try{ localStorage.setItem(REPORT_CACHE_KEY, JSON.stringify(list)); }catch(e){ /* ignore quota errors */ }
+}
+let reports = loadCachedReports();
 reports.forEach(r=>{
   if(typeof r.lat !== 'number'){
     const riv = RIVERS.find(x=>x.id===r.riverId);
     if(riv){ r.lat = riv.lat + (Math.random()-0.5)*0.006; r.lng = riv.lng + (Math.random()-0.5)*0.006; }
   }
 });
-saveReports(reports);
 
-function addReport(riverId, symptom, comment){
+async function loadReportsFromServer(){
+  try{
+    const res = await fetch(`${PROXY_BASE}/api/reports`, { signal: AbortSignal.timeout(15000) });
+    if(!res.ok) throw new Error('bad status ' + res.status);
+    const data = await res.json();
+    reports = (data.reports || []).map(r=>{
+      if(typeof r.lat !== 'number'){
+        const riv = RIVERS.find(x=>x.id===r.riverId);
+        if(riv){ r.lat = riv.lat + (Math.random()-0.5)*0.006; r.lng = riv.lng + (Math.random()-0.5)*0.006; }
+      }
+      return r;
+    });
+    cacheReports(reports);
+  }catch(err){
+    console.warn('제보 서버 연결 실패 — 로컬 캐시로 표시합니다.', err);
+  }
+  renderReportFeed();
+  renderCommunityStats();
+  renderAllReportMarkers();
+}
+
+async function addReport(riverId, symptom, comment, photo){
+  const res = await fetch(`${PROXY_BASE}/api/reports`, {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ riverId, symptom, comment, photo }),
+    signal: AbortSignal.timeout(30000)
+  });
+  const data = await res.json();
+  if(!res.ok) throw new Error(data.message || data.error || '제보 등록 실패');
   const river = RIVERS.find(r=>r.id===riverId);
   const jitter = ()=> (Math.random()-0.5)*0.006;
-  const report = {
-    id: Date.now()+'-'+Math.random().toString(36).slice(2,7),
-    riverId, symptom, comment,
-    lat: river.lat + jitter(),
-    lng: river.lng + jitter(),
-    time: new Date().toISOString()
-  };
+  const report = { ...data.report, lat: river.lat + jitter(), lng: river.lng + jitter() };
   reports.unshift(report);
-  saveReports(reports);
+  cacheReports(reports);
   renderReportFeed();
   renderCommunityStats();
   if(mapReady) addReportMarker(report);
   return report;
+}
+
+function resizeImageFile(file, maxDim, quality){
+  return new Promise((resolve, reject)=>{
+    const img = new Image();
+    const reader = new FileReader();
+    reader.onerror = reject;
+    reader.onload = ()=>{
+      img.onerror = reject;
+      img.onload = ()=>{
+        let { width, height } = img;
+        if(width > height && width > maxDim){ height = Math.round(height * maxDim / width); width = maxDim; }
+        else if(height > maxDim){ width = Math.round(width * maxDim / height); height = maxDim; }
+        const canvas = document.createElement('canvas');
+        canvas.width = width; canvas.height = height;
+        canvas.getContext('2d').drawImage(img, 0, 0, width, height);
+        resolve(canvas.toDataURL('image/jpeg', quality));
+      };
+      img.src = reader.result;
+    };
+    reader.readAsDataURL(file);
+  });
 }
 
 function fmtTime(iso){
@@ -694,6 +747,7 @@ function renderReportFeed(){
       <div class="rf-head"><span class="rf-river">${river?river.name:'알수없음'}</span><span class="rf-time">${fmtTime(r.time)}</span></div>
       <span class="rf-symptom">${r.symptom}</span>
       ${r.comment ? `<div class="rf-comment">${escapeHtml(r.comment)}</div>` : ''}
+      ${r.photo ? `<img class="rf-photo" src="${r.photo}" alt="증거 사진" onclick="window.open(this.src,'_blank')">` : ''}
     </div>`;
   }).join('');
 }
@@ -1010,7 +1064,7 @@ function initMap(){
   mapReady = true;
 
   RIVERS.forEach(addRiverMarker);
-  reports.forEach(addReportMarker);
+  renderAllReportMarkers();
 }
 
 function addRiverMarker(r){
@@ -1027,6 +1081,16 @@ function addRiverMarker(r){
 }
 
 let openPopup = null;
+let reportMarkerOverlays = [];
+function clearReportMarkers(){
+  reportMarkerOverlays.forEach(ov => ov.setMap(null));
+  reportMarkerOverlays = [];
+}
+function renderAllReportMarkers(){
+  if(!mapReady) return;
+  clearReportMarkers();
+  reports.forEach(addReportMarker);
+}
 function addReportMarker(rep){
   const river = RIVERS.find(x=>x.id===rep.riverId);
   const el = document.createElement('div');
@@ -1040,6 +1104,7 @@ function addReportMarker(rep){
       <b>${river?river.name:''}</b><br>
       <span style="color:#d03b3b;font-weight:700;">${rep.symptom}</span><br>
       ${rep.comment ? escapeHtml(rep.comment)+'<br>' : ''}
+      ${rep.photo ? `<img src="${rep.photo}" style="width:100%;max-height:120px;object-fit:cover;border-radius:6px;margin-top:4px;">` : ''}
       <span style="color:#898781;">${fmtTime(rep.time)}</span>`;
     const popup = new kakao.maps.CustomOverlay({
       map, position: new kakao.maps.LatLng(rep.lat, rep.lng), content: box, yAnchor: 1.3
@@ -1047,9 +1112,10 @@ function addReportMarker(rep){
     box.querySelector('.close').addEventListener('click', ()=> popup.setMap(null));
     openPopup = popup;
   });
-  new kakao.maps.CustomOverlay({
+  const overlay = new kakao.maps.CustomOverlay({
     map, position: new kakao.maps.LatLng(rep.lat, rep.lng), content: el, yAnchor: 0.5
   });
+  reportMarkerOverlays.push(overlay);
 }
 
 function renderAlertBanner(){
@@ -1073,14 +1139,37 @@ function showToast(msg){
 
 document.getElementById('overlayBg').addEventListener('click', closeDetail);
 
-document.getElementById('reportForm').addEventListener('submit', e=>{
+document.getElementById('reportPhoto').addEventListener('change', async e=>{
+  const file = e.target.files[0];
+  const preview = document.getElementById('reportPhotoPreview');
+  if(!file){ preview.style.display = 'none'; return; }
+  const dataUrl = await resizeImageFile(file, 900, 0.6);
+  preview.src = dataUrl;
+  preview.style.display = 'block';
+});
+
+document.getElementById('reportForm').addEventListener('submit', async e=>{
   e.preventDefault();
   const riverId = document.getElementById('reportRiver').value;
   const symptom = document.getElementById('reportSymptom').value;
   const comment = document.getElementById('reportComment').value.trim();
-  addReport(riverId, symptom, comment);
-  document.getElementById('reportComment').value = '';
-  showToast('제보가 등록되었습니다. 감사합니다!');
+  const photoFile = document.getElementById('reportPhoto').files[0];
+  const submitBtn = document.getElementById('reportSubmitBtn');
+  submitBtn.disabled = true;
+  submitBtn.textContent = '등록 중...';
+  try{
+    const photo = photoFile ? await resizeImageFile(photoFile, 900, 0.6) : null;
+    await addReport(riverId, symptom, comment, photo);
+    document.getElementById('reportComment').value = '';
+    document.getElementById('reportPhoto').value = '';
+    document.getElementById('reportPhotoPreview').style.display = 'none';
+    showToast('제보가 등록되었습니다. 감사합니다!');
+  }catch(err){
+    showToast('제보 등록에 실패했습니다: ' + (err.message || err));
+  }finally{
+    submitBtn.disabled = false;
+    submitBtn.textContent = '제보 등록';
+  }
 });
 
 document.getElementById('communityFilter').addEventListener('change', renderReportFeed);
@@ -1090,6 +1179,7 @@ renderRiverList();
 renderReportFeed();
 renderCommunityStats();
 loadLiveRiverData();
+loadReportsFromServer();
 
 (function loadKakao(){
   const KEY = '38db833f1747297f55b45d683d0feb3f';

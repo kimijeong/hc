@@ -22,6 +22,13 @@ const PORT = process.env.PORT || 8787;
 const DATA_GO_KR_KEY = process.env.DATA_GO_KR_KEY || '';
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY || '';
 
+let kv = null;
+try { kv = require('@vercel/kv').kv; } catch (e) { /* run `npm install` to enable shared reports */ }
+
+const REPORTS_KEY = 'bever:reports';
+const MAX_REPORTS = 300;
+const MAX_PHOTO_BYTES = 900000;
+
 // 부산광역시 하천수질 자동측정망 13개 관측소 코드 (8개 하천)
 const STATIONS = {
   oncheon: '103',              // 온천천 이섭교
@@ -201,6 +208,50 @@ const server = http.createServer(async (req, res) => {
       } catch (err) {
         console.error(err);
         sendJSON(res, 500, { error: 'diagnose_failed', message: String(err.message || err) });
+      }
+    });
+    return;
+  }
+
+  if (req.method === 'GET' && url.pathname === '/api/reports') {
+    if (!kv) return sendJSON(res, 500, { error: 'kv_unavailable', message: '@vercel/kv가 설치되지 않았습니다. npm install을 실행하세요.' });
+    try {
+      const reports = (await kv.get(REPORTS_KEY)) || [];
+      return sendJSON(res, 200, { reports });
+    } catch (err) {
+      console.error(err);
+      return sendJSON(res, 500, { error: 'kv_failed', message: String(err.message || err) });
+    }
+  }
+
+  if (req.method === 'POST' && url.pathname === '/api/reports') {
+    if (!kv) return sendJSON(res, 500, { error: 'kv_unavailable', message: '@vercel/kv가 설치되지 않았습니다. npm install을 실행하세요.' });
+    let body = '';
+    req.on('data', chunk => { body += chunk; });
+    req.on('end', async () => {
+      try {
+        const { riverId, symptom, comment, photo } = JSON.parse(body || '{}');
+        if (!riverId || !symptom) return sendJSON(res, 400, { error: 'missing_fields' });
+        if (photo && photo.length > MAX_PHOTO_BYTES) return sendJSON(res, 413, { error: 'photo_too_large' });
+
+        const report = {
+          id: Date.now() + '-' + Math.random().toString(36).slice(2, 7),
+          riverId,
+          symptom,
+          comment: (comment || '').slice(0, 300),
+          photo: photo || null,
+          time: new Date().toISOString()
+        };
+
+        const existing = (await kv.get(REPORTS_KEY)) || [];
+        existing.unshift(report);
+        if (existing.length > MAX_REPORTS) existing.length = MAX_REPORTS;
+        await kv.set(REPORTS_KEY, existing);
+
+        sendJSON(res, 200, { report });
+      } catch (err) {
+        console.error(err);
+        sendJSON(res, 500, { error: 'kv_failed', message: String(err.message || err) });
       }
     });
     return;
