@@ -28,6 +28,13 @@ async function fetchStationData(locCode, key) {
   const url = `https://apis.data.go.kr/6260000/RiverQualityService/getRiverQualityStation?serviceKey=${encodeKeyIfNeeded(key)}&pageNo=1&numOfRows=25000&resultType=json&locCode=${locCode}`;
   const res = await fetch(url);
   const json = await res.json();
+  const upstreamErr = json?.OpenAPI_ServiceResponse?.cmmMsgHeader?.errMsg
+    || (json?.response?.header?.resultCode && json.response.header.resultCode !== '00' ? json.response.header.resultMsg : null);
+  if (upstreamErr) {
+    const err = new Error(`upstream: ${upstreamErr}`);
+    err.upstream = true;
+    throw err;
+  }
   const items = json?.response?.body?.items?.item || [];
   const valid = items.filter(it => it.temp && it.temp !== '-' && it.hourTime);
   valid.sort((a, b) => b.hourTime.localeCompare(a.hourTime));
