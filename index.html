@@ -482,34 +482,36 @@ function gradeFromBOD(bod){
   return 'VI';
 }
 function gradeFromSensors(d){
+  // 환경기준 대비 초과 배율 기준으로 채점 (기준: DO>=5.0, pH 6.5~8.5, 탁도<=15, TDS<=500)
   let score = 0;
   const doVal = d.do;
-  if(doVal<2) score+=5;
+  if(doVal<2) score+=6;
   else if(doVal<3.5) score+=4;
   else if(doVal<5) score+=3;
-  else if(doVal<6.5) score+=2;
-  else if(doVal<7.5) score+=1;
+  else if(doVal<6.5) score+=1;
+  else if(doVal<7.5) score+=0.5;
 
   const ph = d.ph;
   if(ph<6.5 || ph>8.5){
-    const dev = Math.abs(ph-7);
-    score += Math.min(5, 1+Math.floor((dev-1.5)*2));
-  }else if(Math.abs(ph-7)>1) score+=1;
+    const dev = Math.max(6.5-ph, ph-8.5);
+    score += Math.min(6, 2 + dev*2);
+  }
 
-  const turb = d.turbidity;
-  if(turb>100) score+=3;
-  else if(turb>50) score+=2;
-  else if(turb>15) score+=1;
+  const turbRatio = d.turbidity / 15;
+  if(turbRatio>6) score+=6;
+  else if(turbRatio>3) score+=4;
+  else if(turbRatio>1.5) score+=2.5;
+  else if(turbRatio>1) score+=1;
 
-  const tds = d.tds;
-  if(tds>2000) score+=3;
-  else if(tds>1000) score+=2;
-  else if(tds>500) score+=1;
+  const tdsRatio = d.tds / 500;
+  if(tdsRatio>4) score+=4;
+  else if(tdsRatio>2) score+=2.5;
+  else if(tdsRatio>1) score+=1;
 
   if(score<=1) return 'I';
-  if(score<=3) return 'II';
-  if(score<=5) return 'III';
-  if(score<=8) return 'IV';
+  if(score<=2.5) return 'II';
+  if(score<=4.5) return 'III';
+  if(score<=7) return 'IV';
   if(score<=11) return 'V';
   return 'VI';
 }
