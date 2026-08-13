@@ -49,5 +49,19 @@ module.exports = async (req, res) => {
     return;
   }
 
+  if (req.method === 'DELETE') {
+    try {
+      const id = req.query.id;
+      if (!id) { res.status(400).json({ error: 'missing_id' }); return; }
+      const existing = (await kv.get(REPORTS_KEY)) || [];
+      const next = existing.filter(r => r.id !== id);
+      await kv.set(REPORTS_KEY, next);
+      res.status(200).json({ deleted: existing.length !== next.length });
+    } catch (err) {
+      res.status(500).json({ error: 'kv_failed', message: String(err.message || err) });
+    }
+    return;
+  }
+
   res.status(405).json({ error: 'method_not_allowed' });
 };

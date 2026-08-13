@@ -257,6 +257,21 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  if (req.method === 'DELETE' && url.pathname === '/api/reports') {
+    if (!kv) return sendJSON(res, 500, { error: 'kv_unavailable', message: '@vercel/kv가 설치되지 않았습니다. npm install을 실행하세요.' });
+    try {
+      const id = url.searchParams.get('id');
+      if (!id) return sendJSON(res, 400, { error: 'missing_id' });
+      const existing = (await kv.get(REPORTS_KEY)) || [];
+      const next = existing.filter(r => r.id !== id);
+      await kv.set(REPORTS_KEY, next);
+      return sendJSON(res, 200, { deleted: existing.length !== next.length });
+    } catch (err) {
+      console.error(err);
+      return sendJSON(res, 500, { error: 'kv_failed', message: String(err.message || err) });
+    }
+  }
+
   sendJSON(res, 404, { error: 'not_found' });
 });
 

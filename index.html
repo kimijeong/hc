@@ -130,6 +130,11 @@
   .report-item .rf-symptom{ display:inline-block; margin-top:3px; font-size:11px; padding:1px 6px; border-radius:999px; background:#fdecea; color:var(--critical); font-weight:700; }
   .report-item .rf-comment{ margin-top:4px; color:var(--text-secondary); }
   .report-item .rf-photo{ margin-top:6px; width:100%; max-height:120px; object-fit:cover; border-radius:6px; display:block; cursor:pointer; }
+  .report-item .rf-delete{
+    margin-top:6px; border:none; background:none; color:var(--text-muted); font-size:10.5px;
+    cursor:pointer; padding:2px 0;
+  }
+  .report-item .rf-delete:hover{ color:var(--critical); }
   .report-empty{ font-size:12px; color:var(--text-muted); padding:8px 0; }
 
   .tab-bar{ display:flex; border-bottom:1px solid var(--border); }
@@ -748,8 +753,28 @@ function renderReportFeed(){
       <span class="rf-symptom">${r.symptom}</span>
       ${r.comment ? `<div class="rf-comment">${escapeHtml(r.comment)}</div>` : ''}
       ${r.photo ? `<img class="rf-photo" src="${r.photo}" alt="증거 사진" onclick="window.open(this.src,'_blank')">` : ''}
+      <button class="rf-delete" data-id="${r.id}" title="삭제">🗑 삭제</button>
     </div>`;
   }).join('');
+  feed.querySelectorAll('.rf-delete').forEach(btn=>{
+    btn.addEventListener('click', ()=> deleteReport(btn.dataset.id));
+  });
+}
+
+async function deleteReport(id){
+  if(!confirm('이 제보를 삭제할까요?')) return;
+  try{
+    const res = await fetch(`${PROXY_BASE}/api/reports?id=${encodeURIComponent(id)}`, { method:'DELETE', signal: AbortSignal.timeout(15000) });
+    if(!res.ok) throw new Error('삭제 실패');
+    reports = reports.filter(r=>r.id!==id);
+    cacheReports(reports);
+    renderReportFeed();
+    renderCommunityStats();
+    renderAllReportMarkers();
+    showToast('제보를 삭제했습니다.');
+  }catch(err){
+    showToast('삭제에 실패했습니다: ' + (err.message || err));
+  }
 }
 
 function renderCommunityStats(){
