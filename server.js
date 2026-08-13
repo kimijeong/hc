@@ -42,8 +42,14 @@ const STATIONS = {
 const CACHE_TTL_MS = 30 * 60 * 1000; // 30분 캐시
 const cache = {};
 
+function encodeKeyIfNeeded(key) {
+  // data.go.kr service keys never contain a literal '%'; if we see one,
+  // the key is already percent-encoded (the "Encoding" form) — use as-is.
+  return key.includes('%') ? key : encodeURIComponent(key);
+}
+
 async function fetchStationData(locCode) {
-  const url = `https://apis.data.go.kr/6260000/RiverQualityService/getRiverQualityStation?serviceKey=${DATA_GO_KR_KEY}&pageNo=1&numOfRows=25000&resultType=json&locCode=${locCode}`;
+  const url = `https://apis.data.go.kr/6260000/RiverQualityService/getRiverQualityStation?serviceKey=${encodeKeyIfNeeded(DATA_GO_KR_KEY)}&pageNo=1&numOfRows=25000&resultType=json&locCode=${locCode}`;
   const res = await fetch(url);
   const json = await res.json();
   const items = json?.response?.body?.items?.item || [];
