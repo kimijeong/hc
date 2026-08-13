@@ -628,6 +628,7 @@ async function runAiDiagnosis(r){
     });
     const data = await res.json();
     if(!res.ok) throw new Error(data.message || '진단 실패');
+    r.aiDiagnosis = data.diagnosis;
     out.innerHTML = `<div class="ai-result">${escapeHtml(data.diagnosis).replace(/\n/g,'<br>')}</div>`;
   }catch(err){
     out.innerHTML = `<div class="ai-error">AI 진단 서버에 연결하지 못했습니다. 로컬에서 <code>node server.js</code> 실행 중인지, .env에 ANTHROPIC_API_KEY가 있는지 확인해주세요.<br><span style="font-size:11px;color:var(--text-muted)">${escapeHtml(String(err.message||err))}</span></div>`;
@@ -919,8 +920,8 @@ function renderDetail(r){
 
     <div class="section-title">AI 정밀진단 · 향후 예측</div>
     <div class="ai-panel">
-      <button id="aiDiagnoseBtn" class="ai-btn">🤖 AI 정밀진단 · 향후 예측</button>
-      <div id="aiDiagnoseResult"></div>
+      <button id="aiDiagnoseBtn" class="ai-btn">🤖 ${r.aiDiagnosis ? '다시 진단받기' : 'AI 정밀진단 · 향후 예측'}</button>
+      <div id="aiDiagnoseResult">${r.aiDiagnosis ? `<div class="ai-result">${escapeHtml(r.aiDiagnosis).replace(/\n/g,'<br>')}</div>` : ''}</div>
     </div>
   `;
 
