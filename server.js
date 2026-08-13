@@ -28,7 +28,7 @@ const STATIONS = {
   dongcheon: '111',            // 동천 성서교
   oncheon_buguk: '101',        // 온천천 부곡교
   oncheon_sebyeong: '102',     // 온천천 세병교
-  suyeong_hoedong: '104',      // 수영강 회동교
+  suyeong_hoedong: '104',      // 수영강 회동교d
   suyeong_sewol: '105',        // 수영강 세월교
   suyeong_dongcheongyo: '108', // 수영강 동천교
   samrak_gangseon: '106',      // 삼락천 강선교
@@ -129,7 +129,7 @@ ${reportSummary}
     },
     body: JSON.stringify({
       model: 'claude-sonnet-4-5',
-      max_tokens: 650,
+      max_tokens: 1100,
       messages: [{ role: 'user', content: prompt }]
     })
   });
@@ -153,6 +153,18 @@ const server = http.createServer(async (req, res) => {
   }
 
   const url = new URL(req.url, `http://localhost:${PORT}`);
+
+  if (req.method === 'GET' && url.pathname === '/api/river-live') {
+    const id = url.searchParams.get('id');
+    if (!STATIONS[id]) return sendJSON(res, 400, { error: 'unknown_id' });
+    try {
+      const data = await getRiverLive(id);
+      return sendJSON(res, 200, data);
+    } catch (err) {
+      console.error(err);
+      return sendJSON(res, 500, { error: 'fetch_failed', message: String(err.message || err) });
+    }
+  }
 
   if (req.method === 'GET' && url.pathname === '/api/rivers/live') {
     try {

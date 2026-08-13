@@ -3,7 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>부산 하천 수질 지킴이</title>
+<title>BEVER</title>
+<link rel="icon" type="image/png" href="logo.png">
 <style>
   :root{
     --surface-1:      #fcfcfb;
@@ -30,15 +31,18 @@
     color: var(--text-primary);
   }
   header.topbar{
-    padding:16px 20px;
+    min-height:65px;
+    padding:0 20px;
     background: var(--surface-1);
     border-bottom:1px solid var(--border);
     display:flex;
-    align-items:baseline;
+    align-items:center;
+    align-content:center;
     gap:12px;
     flex-wrap:wrap;
   }
-  header.topbar h1{ font-size:20px; margin:0; }
+  header.topbar h1{ font-size:20px; margin:0; display:flex; align-items:center; gap:8px; }
+  header.topbar h1 img{ width:44px; height:44px; border-radius:10px; object-fit:cover; }
   header.topbar p{ margin:0; font-size:13px; color:var(--text-secondary); }
 
   .layout{
@@ -286,7 +290,7 @@
 <body>
 
 <header class="topbar">
-  <h1>🌊 부산 하천 수질 지킴이</h1>
+  <h1><img src="logo.png" alt="BEVER"> BEVER</h1>
   <p>실측 데이터로 확인하는 우리 동네 하천 — 시민 제보로 함께 지켜요</p>
 </header>
 
@@ -532,7 +536,9 @@ RIVERS.forEach(r=>{
 /* ---------------------------------------------------------
    Live data proxy (server.js — real-time sensors + AI diagnosis)
 --------------------------------------------------------- */
-const PROXY_BASE = 'http://localhost:8787';
+const PROXY_BASE = (location.hostname === 'localhost' || location.hostname === '127.0.0.1')
+  ? 'http://localhost:8787'
+  : '';
 let currentDetailRiverId = null;
 
 function parseHourTime(ht){
@@ -549,37 +555,38 @@ function metricSourceTag(r, key){
   return '';
 }
 
-async function loadLiveRiverData(){
+async function loadOneRiverLive(river){
   try{
-    const res = await fetch(`${PROXY_BASE}/api/rivers/live`, { signal: AbortSignal.timeout(20000) });
-    if(!res.ok) throw new Error('bad status ' + res.status);
-    const data = await res.json();
-    Object.keys(data).forEach(id=>{
-      const river = RIVERS.find(r=>r.id===id);
-      const info = data[id];
-      if(!river || !info || !info.latest){ if(river) river.liveOffline = true; return; }
-      const ageHours = (Date.now() - parseHourTime(info.latest.hourTime).getTime()) / 3600000;
-      if(ageHours > 48){
-        river.liveOffline = true;
-        river.liveHourTime = info.latest.hourTime;
-        return;
-      }
-      river.isLive = true;
+    const res = await fetch(`${PROXY_BASE}/api/river-live?id=${river.id}`, { signal: AbortSignal.timeout(20000) });
+    if(!res.ok) return;
+    const info = await res.json();
+    if(!info || !info.latest){ river.liveOffline = true; return; }
+    const ageHours = (Date.now() - parseHourTime(info.latest.hourTime).getTime()) / 3600000;
+    if(ageHours > 48){
+      river.liveOffline = true;
       river.liveHourTime = info.latest.hourTime;
-      river.liveTrend = info.trend24;
-      ['do','ph','turbidity','tds','temp'].forEach(k=>{
-        if(typeof info.latest[k] === 'number' && !Number.isNaN(info.latest[k])){
-          river.actual[k] = info.latest[k];
-          if(river.sensorOnly) river.official[k] = info.latest[k];
-        }
-      });
-      river.actualGrade = computeGrade(river.actual);
-      if(river.sensorOnly) river.officialGrade = computeGrade(river.official);
+      return;
+    }
+    river.isLive = true;
+    river.liveHourTime = info.latest.hourTime;
+    river.liveTrend = info.trend24;
+    ['do','ph','turbidity','tds','temp'].forEach(k=>{
+      if(typeof info.latest[k] === 'number' && !Number.isNaN(info.latest[k])){
+        river.actual[k] = info.latest[k];
+        if(river.sensorOnly) river.official[k] = info.latest[k];
+      }
     });
+    river.actualGrade = computeGrade(river.actual);
+    if(river.sensorOnly) river.officialGrade = computeGrade(river.official);
   }catch(err){
-    console.warn('실시간 데이터 서버(localhost:8787) 연결 실패 — 데모 값을 사용합니다.', err);
+    console.warn(`실시간 데이터 실패 (${river.id})`, err);
   }
+}
+
+async function loadLiveRiverData(){
+  await Promise.all(RIVERS.map(loadOneRiverLive));
   renderRiverList();
+  renderCommunityStats();
   if(currentDetailRiverId){
     const r = RIVERS.find(x=>x.id===currentDetailRiverId);
     if(r) renderDetail(r);
@@ -676,9 +683,17 @@ function renderReportFeed(){
 function renderCommunityStats(){
   const wrap = document.getElementById('communityStats');
   if(!wrap) return;
-  wrap.innerHTML = RIVERS.map(r=>{
-    const count = reports.filter(x=>x.riverId===r.id).length;
-    return `<span class="stat-pill"><span class="dot" style="background:${GRADE_COLOR[r.actualGrade]}"></span>${r.name} ${count}</span>`;
+  const groups = {};
+  const order = [];
+  RIVERS.forEach(r=>{
+    const group = r.name.split(' · ')[0];
+    if(!groups[group]){ groups[group] = { count:0, grade:r.actualGrade }; order.push(group); }
+    groups[group].count += reports.filter(x=>x.riverId===r.id).length;
+    if(GRADE_RANK[r.actualGrade] > GRADE_RANK[groups[group].grade]) groups[group].grade = r.actualGrade;
+  });
+  wrap.innerHTML = order.map(g=>{
+    const info = groups[g];
+    return `<span class="stat-pill"><span class="dot" style="background:${GRADE_COLOR[info.grade]}"></span>${g} ${info.count}</span>`;
   }).join('');
 }
 
@@ -741,11 +756,13 @@ function renderRiverList(){
     head.addEventListener('click', ()=> head.closest('.river-group').classList.toggle('open'));
   });
 
+  const sortedRivers = [...RIVERS].sort((a,b)=> a.name.localeCompare(b.name, 'ko'));
+
   const sel = document.getElementById('reportRiver');
-  sel.innerHTML = RIVERS.map(r=>`<option value="${r.id}">${r.name}</option>`).join('');
+  sel.innerHTML = sortedRivers.map(r=>`<option value="${r.id}">${r.name}</option>`).join('');
 
   const filterSel = document.getElementById('communityFilter');
-  filterSel.innerHTML = '<option value="all">전체 하천</option>' + RIVERS.map(r=>`<option value="${r.id}">${r.name}</option>`).join('');
+  filterSel.innerHTML = '<option value="all">전체 하천</option>' + sortedRivers.map(r=>`<option value="${r.id}">${r.name}</option>`).join('');
 }
 
 function initTabs(){
