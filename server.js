@@ -230,7 +230,7 @@ const server = http.createServer(async (req, res) => {
     req.on('data', chunk => { body += chunk; });
     req.on('end', async () => {
       try {
-        const { riverId, symptom, comment, photo } = JSON.parse(body || '{}');
+        const { riverId, symptom, comment, photo, authorId } = JSON.parse(body || '{}');
         if (!riverId || !symptom) return sendJSON(res, 400, { error: 'missing_fields' });
         if (photo && photo.length > MAX_PHOTO_BYTES) return sendJSON(res, 413, { error: 'photo_too_large' });
 
@@ -240,6 +240,7 @@ const server = http.createServer(async (req, res) => {
           symptom,
           comment: (comment || '').slice(0, 300),
           photo: photo || null,
+          authorId: authorId || null,
           time: new Date().toISOString()
         };
 
@@ -261,11 +262,17 @@ const server = http.createServer(async (req, res) => {
     if (!kv) return sendJSON(res, 500, { error: 'kv_unavailable', message: '@vercel/kv가 설치되지 않았습니다. npm install을 실행하세요.' });
     try {
       const id = url.searchParams.get('id');
+      const authorId = url.searchParams.get('authorId');
       if (!id) return sendJSON(res, 400, { error: 'missing_id' });
       const existing = (await kv.get(REPORTS_KEY)) || [];
+      const target = existing.find(r => r.id === id);
+      if (!target) return sendJSON(res, 404, { error: 'not_found' });
+      if (target.authorId && target.authorId !== authorId) {
+        return sendJSON(res, 403, { error: 'not_author' });
+      }
       const next = existing.filter(r => r.id !== id);
       await kv.set(REPORTS_KEY, next);
-      return sendJSON(res, 200, { deleted: existing.length !== next.length });
+      return sendJSON(res, 200, { deleted: true });
     } catch (err) {
       console.error(err);
       return sendJSON(res, 500, { error: 'kv_failed', message: String(err.message || err) });

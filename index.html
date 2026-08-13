@@ -689,11 +689,21 @@ async function loadReportsFromServer(){
   renderAllReportMarkers();
 }
 
+function getDeviceId(){
+  let id = localStorage.getItem('bever-device-id');
+  if(!id){
+    id = (crypto.randomUUID ? crypto.randomUUID() : (Date.now()+'-'+Math.random().toString(36).slice(2)));
+    localStorage.setItem('bever-device-id', id);
+  }
+  return id;
+}
+const DEVICE_ID = getDeviceId();
+
 async function addReport(riverId, symptom, comment, photo){
   const res = await fetch(`${PROXY_BASE}/api/reports`, {
     method: 'POST',
     headers: {'Content-Type':'application/json'},
-    body: JSON.stringify({ riverId, symptom, comment, photo }),
+    body: JSON.stringify({ riverId, symptom, comment, photo, authorId: DEVICE_ID }),
     signal: AbortSignal.timeout(30000)
   });
   const data = await res.json();
@@ -753,7 +763,7 @@ function renderReportFeed(){
       <span class="rf-symptom">${r.symptom}</span>
       ${r.comment ? `<div class="rf-comment">${escapeHtml(r.comment)}</div>` : ''}
       ${r.photo ? `<img class="rf-photo" src="${r.photo}" alt="증거 사진" onclick="window.open(this.src,'_blank')">` : ''}
-      <button class="rf-delete" data-id="${r.id}" title="삭제">🗑 삭제</button>
+      ${(!r.authorId || r.authorId===DEVICE_ID) ? `<button class="rf-delete" data-id="${r.id}" title="삭제">🗑 삭제</button>` : ''}
     </div>`;
   }).join('');
   feed.querySelectorAll('.rf-delete').forEach(btn=>{
@@ -764,7 +774,7 @@ function renderReportFeed(){
 async function deleteReport(id){
   if(!confirm('이 제보를 삭제할까요?')) return;
   try{
-    const res = await fetch(`${PROXY_BASE}/api/reports?id=${encodeURIComponent(id)}`, { method:'DELETE', signal: AbortSignal.timeout(15000) });
+    const res = await fetch(`${PROXY_BASE}/api/reports?id=${encodeURIComponent(id)}&authorId=${encodeURIComponent(DEVICE_ID)}`, { method:'DELETE', signal: AbortSignal.timeout(15000) });
     if(!res.ok) throw new Error('삭제 실패');
     reports = reports.filter(r=>r.id!==id);
     cacheReports(reports);
