@@ -624,7 +624,7 @@ async function runAiDiagnosis(r){
       method:'POST',
       headers:{'Content-Type':'application/json'},
       body: JSON.stringify({ riverName:r.name, actual:r.actual, official:r.official, reports:riverReports, trend }),
-      signal: AbortSignal.timeout(25000)
+      signal: AbortSignal.timeout(55000)
     });
     const data = await res.json();
     if(!res.ok) throw new Error(data.message || '진단 실패');
