@@ -81,6 +81,27 @@
   .river-card .badge{ font-size:11px; font-weight:700; padding:2px 7px; border-radius:999px; color:#fff; }
   .river-card .warn-flag{ font-size:10px; color:var(--critical); font-weight:700; }
 
+  .river-group{ margin-bottom:8px; }
+  .river-group-head{
+    display:flex; align-items:center; gap:10px; padding:10px; cursor:pointer;
+    border:1px solid var(--border); border-radius:8px; background:#f2f1ee;
+  }
+  .river-group.open .river-group-head{ border-radius:8px 8px 0 0; }
+  .river-group-head:hover{ background:#eceae5; }
+  .river-group-head .dot{ width:14px; height:14px; border-radius:50%; flex:0 0 auto; border:2px solid #fff; box-shadow:0 0 0 1px var(--border); }
+  .river-group-head .info{ flex:1; min-width:0; }
+  .river-group-head .name{ font-size:14px; font-weight:700; }
+  .river-group-head .group-count{ font-weight:400; font-size:11px; color:var(--text-muted); }
+  .river-group-head .sub{ font-size:11px; color:var(--text-muted); }
+  .group-arrow{ font-size:11px; color:var(--text-muted); transition:transform .15s; flex:0 0 auto; }
+  .river-group.open .group-arrow{ transform:rotate(180deg); }
+  .river-group-body{
+    border:1px solid var(--border); border-top:none; border-radius:0 0 8px 8px;
+    padding:8px; display:none; flex-direction:column; gap:6px; background:#fbfbfa;
+  }
+  .river-group.open .river-group-body{ display:flex; }
+  .river-group-body .river-card{ margin-bottom:0; }
+
   #reportForm{ display:flex; flex-direction:column; gap:8px; }
   #reportForm label{ font-size:12px; color:var(--text-secondary); display:flex; flex-direction:column; gap:4px; }
   #reportForm select, #reportForm textarea{
@@ -196,6 +217,32 @@
     margin:14px 18px 0; padding:10px 12px; border-radius:8px;
     background:#fdecea; border:1px solid var(--critical); color:var(--critical);
     font-size:13px; font-weight:700; display:flex; gap:8px; align-items:flex-start;
+  }
+
+  .live-badge{
+    margin:10px 18px 0; padding:6px 10px; border-radius:6px; font-size:12px; font-weight:700; display:inline-block;
+  }
+  .live-badge.live-on{ background:#eafaf0; color:var(--good); border:1px solid var(--good); }
+  .live-badge.live-off{ background:#f2f1ee; color:var(--text-muted); border:1px solid var(--baseline); }
+
+  .src-tag{ font-size:9.5px; font-weight:700; padding:1px 5px; border-radius:999px; vertical-align:middle; }
+  .src-tag.src-live{ background:#eafaf0; color:var(--good); }
+  .src-tag.src-lab{ background:#f2f1ee; color:var(--text-muted); }
+
+  .ai-panel{ padding:8px 18px 18px; }
+  .ai-btn{
+    padding:9px 14px; border:none; border-radius:6px; background:var(--text-primary); color:#fff;
+    font-weight:700; font-size:13px; cursor:pointer;
+  }
+  .ai-btn:disabled{ opacity:0.6; cursor:default; }
+  .ai-btn:hover:not(:disabled){ background:#2c2c2a; }
+  .ai-result{
+    margin-top:10px; padding:12px; border-radius:8px; background:#f2f1ee; border:1px solid var(--border);
+    font-size:13px; line-height:1.6; color:var(--text-primary); white-space:normal;
+  }
+  .ai-error{
+    margin-top:10px; padding:10px 12px; border-radius:8px; background:#fdecea; border:1px solid var(--critical);
+    font-size:12.5px; color:var(--critical);
   }
 
   .compare-toggle{ padding:14px 18px 0; }
@@ -343,10 +390,52 @@ function gradeFromBOD(bod){
   if(bod<=15) return 'V';
   return 'VI';
 }
+function gradeFromSensors(d){
+  let score = 0;
+  const doVal = d.do;
+  if(doVal<2) score+=5;
+  else if(doVal<3.5) score+=4;
+  else if(doVal<5) score+=3;
+  else if(doVal<6.5) score+=2;
+  else if(doVal<7.5) score+=1;
+
+  const ph = d.ph;
+  if(ph<6.5 || ph>8.5){
+    const dev = Math.abs(ph-7);
+    score += Math.min(5, 1+Math.floor((dev-1.5)*2));
+  }else if(Math.abs(ph-7)>1) score+=1;
+
+  const turb = d.turbidity;
+  if(turb>100) score+=3;
+  else if(turb>50) score+=2;
+  else if(turb>15) score+=1;
+
+  const tds = d.tds;
+  if(tds>2000) score+=3;
+  else if(tds>1000) score+=2;
+  else if(tds>500) score+=1;
+
+  if(score<=1) return 'I';
+  if(score<=3) return 'II';
+  if(score<=5) return 'III';
+  if(score<=8) return 'IV';
+  if(score<=11) return 'V';
+  return 'VI';
+}
+function computeGrade(dataObj){
+  if(typeof dataObj.bod === 'number') return gradeFromBOD(dataObj.bod);
+  if(typeof dataObj.do==='number' && typeof dataObj.ph==='number' && typeof dataObj.turbidity==='number' && typeof dataObj.tds==='number'){
+    return gradeFromSensors(dataObj);
+  }
+  return 'III';
+}
+function metricsFor(r){
+  return METRICS.filter(m => m.key!=='bod' || typeof r.actual.bod==='number');
+}
 
 const RIVERS = [
   {
-    id:'oncheon', name:'온천천', district:'부산 동래구', lat:35.2075, lng:129.0864,
+    id:'oncheon', name:'온천천 · 이섭교', district:'부산 동래구', lat:35.2075, lng:129.0864,
     manipulated:true,
     actual:   { bod:18.7, do:0.8, ph:4.3, turbidity:87.4, tds:1920, temp:31.4 },
     official: { bod:2.8,  do:7.2, ph:7.4, turbidity:5.2,  tds:180,  temp:22.5 }
@@ -358,17 +447,171 @@ const RIVERS = [
     official: { bod:6.5, do:3.8, ph:6.8, turbidity:22.4, tds:420, temp:24.5 }
   },
   {
-    id:'goejeong', name:'괴정천', district:'부산 사하구', lat:35.0992, lng:128.9878,
+    id:'goejeong', name:'괴정천', district:'부산 사하구 (하단교)', lat:35.0992, lng:128.9878,
     manipulated:false,
-    actual:   { bod:3.8, do:6.5, ph:7.6, turbidity:9.8, tds:210, temp:20.4 },
-    official: { bod:3.8, do:6.5, ph:7.6, turbidity:9.8, tds:210, temp:20.4 }
+    actual:   { bod:23.5, do:1.2, ph:6.9, turbidity:9.8, tds:450, temp:26.8 },
+    official: { bod:23.5, do:1.2, ph:6.9, turbidity:9.8, tds:450, temp:26.8 }
+  },
+  {
+    id:'oncheon_buguk', name:'온천천 · 부곡교', district:'부산 금정구', lat:35.2245, lng:129.0908,
+    manipulated:false, sensorOnly:true,
+    actual:   { do:5.0, ph:7.2, turbidity:10, tds:300, temp:20 },
+    official: { do:5.0, ph:7.2, turbidity:10, tds:300, temp:20 }
+  },
+  {
+    id:'oncheon_sebyeong', name:'온천천 · 세병교', district:'부산 동래구', lat:35.2145, lng:129.0815,
+    manipulated:false, sensorOnly:true,
+    actual:   { do:5.0, ph:7.2, turbidity:10, tds:300, temp:20 },
+    official: { do:5.0, ph:7.2, turbidity:10, tds:300, temp:20 }
+  },
+  {
+    id:'suyeong_hoedong', name:'수영강 · 회동교', district:'부산 금정구', lat:35.2280, lng:129.1150,
+    manipulated:false, sensorOnly:true,
+    actual:   { do:5.0, ph:7.2, turbidity:10, tds:300, temp:20 },
+    official: { do:5.0, ph:7.2, turbidity:10, tds:300, temp:20 }
+  },
+  {
+    id:'suyeong_sewol', name:'수영강 · 세월교', district:'부산 해운대구', lat:35.1950, lng:129.1180,
+    manipulated:false, sensorOnly:true,
+    actual:   { do:5.0, ph:7.2, turbidity:10, tds:300, temp:20 },
+    official: { do:5.0, ph:7.2, turbidity:10, tds:300, temp:20 }
+  },
+  {
+    id:'suyeong_dongcheongyo', name:'수영강 · 동천교', district:'부산 해운대구', lat:35.1780, lng:129.1230,
+    manipulated:false, sensorOnly:true,
+    actual:   { do:5.0, ph:7.2, turbidity:10, tds:300, temp:20 },
+    official: { do:5.0, ph:7.2, turbidity:10, tds:300, temp:20 }
+  },
+  {
+    id:'samrak_gangseon', name:'삼락천 · 강선교', district:'부산 사상구', lat:35.1550, lng:128.9700,
+    manipulated:false, sensorOnly:true,
+    actual:   { do:5.0, ph:7.2, turbidity:10, tds:300, temp:20 },
+    official: { do:5.0, ph:7.2, turbidity:10, tds:300, temp:20 }
+  },
+  {
+    id:'samrak_eumak', name:'삼락천 · 음악분수', district:'부산 사상구', lat:35.1490, lng:128.9650,
+    manipulated:false, sensorOnly:true,
+    actual:   { do:5.0, ph:7.2, turbidity:10, tds:300, temp:20 },
+    official: { do:5.0, ph:7.2, turbidity:10, tds:300, temp:20 }
+  },
+  {
+    id:'seokdae_banseok', name:'석대천 · 반석2호교', district:'부산 해운대구', lat:35.2020, lng:129.1310,
+    manipulated:false, sensorOnly:true,
+    actual:   { do:5.0, ph:7.2, turbidity:10, tds:300, temp:20 },
+    official: { do:5.0, ph:7.2, turbidity:10, tds:300, temp:20 }
+  },
+  {
+    id:'chuncheon_samjeong', name:'춘천 · 삼정그린코아', district:'부산 사상구', lat:35.2010, lng:128.9880,
+    manipulated:false, sensorOnly:true,
+    actual:   { do:5.0, ph:7.2, turbidity:10, tds:300, temp:20 },
+    official: { do:5.0, ph:7.2, turbidity:10, tds:300, temp:20 }
+  },
+  {
+    id:'jwagwang_jungang', name:'좌광천 · 중앙공원', district:'부산 기장군', lat:35.2870, lng:129.2160,
+    manipulated:false, sensorOnly:true,
+    actual:   { do:5.0, ph:7.2, turbidity:10, tds:300, temp:20 },
+    official: { do:5.0, ph:7.2, turbidity:10, tds:300, temp:20 }
+  },
+  {
+    id:'hakjang_hakjang', name:'학장천 · 학장교', district:'부산 사상구', lat:35.1520, lng:128.9800,
+    manipulated:false, sensorOnly:true,
+    actual:   { do:5.0, ph:7.2, turbidity:10, tds:300, temp:20 },
+    official: { do:5.0, ph:7.2, turbidity:10, tds:300, temp:20 }
   }
 ];
 
 RIVERS.forEach(r=>{
-  r.actualGrade = gradeFromBOD(r.actual.bod);
-  r.officialGrade = gradeFromBOD(r.official.bod);
+  r.actualGrade = computeGrade(r.actual);
+  r.officialGrade = computeGrade(r.official);
+  r.isLive = false;
+  r.liveOffline = false;
+  r.liveHourTime = null;
+  r.liveTrend = null;
 });
+
+/* ---------------------------------------------------------
+   Live data proxy (server.js — real-time sensors + AI diagnosis)
+--------------------------------------------------------- */
+const PROXY_BASE = 'http://localhost:8787';
+let currentDetailRiverId = null;
+
+function parseHourTime(ht){
+  const y = +ht.slice(0,4), mo = +ht.slice(4,6)-1, d = +ht.slice(6,8), h = +ht.slice(8,10);
+  return new Date(y, mo, d, h);
+}
+function fmtHourTime(ht){
+  if(!ht) return '';
+  return `${ht.slice(0,4)}-${ht.slice(4,6)}-${ht.slice(6,8)} ${ht.slice(8,10)}시`;
+}
+function metricSourceTag(r, key){
+  if(key==='bod') return '<span class="src-tag src-lab">정밀분석</span>';
+  if(r.isLive) return '<span class="src-tag src-live">실시간</span>';
+  return '';
+}
+
+async function loadLiveRiverData(){
+  try{
+    const res = await fetch(`${PROXY_BASE}/api/rivers/live`, { signal: AbortSignal.timeout(20000) });
+    if(!res.ok) throw new Error('bad status ' + res.status);
+    const data = await res.json();
+    Object.keys(data).forEach(id=>{
+      const river = RIVERS.find(r=>r.id===id);
+      const info = data[id];
+      if(!river || !info || !info.latest){ if(river) river.liveOffline = true; return; }
+      const ageHours = (Date.now() - parseHourTime(info.latest.hourTime).getTime()) / 3600000;
+      if(ageHours > 48){
+        river.liveOffline = true;
+        river.liveHourTime = info.latest.hourTime;
+        return;
+      }
+      river.isLive = true;
+      river.liveHourTime = info.latest.hourTime;
+      river.liveTrend = info.trend24;
+      ['do','ph','turbidity','tds','temp'].forEach(k=>{
+        if(typeof info.latest[k] === 'number' && !Number.isNaN(info.latest[k])){
+          river.actual[k] = info.latest[k];
+          if(river.sensorOnly) river.official[k] = info.latest[k];
+        }
+      });
+      river.actualGrade = computeGrade(river.actual);
+      if(river.sensorOnly) river.officialGrade = computeGrade(river.official);
+    });
+  }catch(err){
+    console.warn('실시간 데이터 서버(localhost:8787) 연결 실패 — 데모 값을 사용합니다.', err);
+  }
+  renderRiverList();
+  if(currentDetailRiverId){
+    const r = RIVERS.find(x=>x.id===currentDetailRiverId);
+    if(r) renderDetail(r);
+  }
+}
+
+async function runAiDiagnosis(r){
+  const btn = document.getElementById('aiDiagnoseBtn');
+  const out = document.getElementById('aiDiagnoseResult');
+  if(!btn || !out) return;
+  btn.disabled = true;
+  btn.textContent = '정밀 분석 중...';
+  out.innerHTML = '';
+  try{
+    const riverReports = reports.filter(x=>x.riverId===r.id).slice(0,10);
+    const trend = (r.isLive && r.liveTrend) ? r.liveTrend : null;
+    const res = await fetch(`${PROXY_BASE}/api/diagnose`, {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ riverName:r.name, actual:r.actual, official:r.official, reports:riverReports, trend }),
+      signal: AbortSignal.timeout(25000)
+    });
+    const data = await res.json();
+    if(!res.ok) throw new Error(data.message || '진단 실패');
+    out.innerHTML = `<div class="ai-result">${escapeHtml(data.diagnosis).replace(/\n/g,'<br>')}</div>`;
+  }catch(err){
+    out.innerHTML = `<div class="ai-error">AI 진단 서버에 연결하지 못했습니다. 로컬에서 <code>node server.js</code> 실행 중인지, .env에 ANTHROPIC_API_KEY가 있는지 확인해주세요.<br><span style="font-size:11px;color:var(--text-muted)">${escapeHtml(String(err.message||err))}</span></div>`;
+  }finally{
+    btn.disabled = false;
+    btn.textContent = '🤖 AI 정밀진단 · 향후 예측';
+  }
+}
 
 /* ---------------------------------------------------------
    Reports (localStorage)
@@ -446,21 +689,56 @@ function escapeHtml(s){
 /* ---------------------------------------------------------
    Sidebar river list
 --------------------------------------------------------- */
+const GRADE_RANK = { I:1, II:2, III:3, IV:4, V:5, VI:6 };
+
+function riverCardHTML(r, subLabel){
+  const label = subLabel || r.name;
+  return `<div class="river-card" data-id="${r.id}">
+    <span class="dot" style="background:${GRADE_COLOR[r.actualGrade]}"></span>
+    <div class="info">
+      <div class="name">${label}</div>
+      <div class="sub">${r.district} · 실측 ${r.actualGrade}등급</div>
+    </div>
+    <span class="badge" style="background:${GRADE_COLOR[r.actualGrade]}">${r.actualGrade}</span>
+  </div>`;
+}
+
 function renderRiverList(){
   const list = document.getElementById('riverList');
-  list.innerHTML = RIVERS.map(r=>`
-    <div class="river-card" data-id="${r.id}">
-      <span class="dot" style="background:${GRADE_COLOR[r.actualGrade]}"></span>
-      <div class="info">
-        <div class="name">${r.name}</div>
-        <div class="sub">${r.district} · 실측 ${r.actualGrade}등급</div>
-        ${r.manipulated ? '<div class="warn-flag">⚠ 공식 발표와 불일치</div>' : ''}
+  const groups = {};
+  const order = [];
+  RIVERS.forEach(r=>{
+    const [group, station] = r.name.split(' · ');
+    if(!groups[group]){ groups[group] = []; order.push(group); }
+    groups[group].push({ river:r, station: station || null });
+  });
+
+  list.innerHTML = order.map(group=>{
+    const members = groups[group];
+    if(members.length === 1){
+      return riverCardHTML(members[0].river);
+    }
+    const worst = members.reduce((a,b)=> GRADE_RANK[b.river.actualGrade] > GRADE_RANK[a.river.actualGrade] ? b : a);
+    return `<div class="river-group">
+      <div class="river-group-head" data-toggle-group>
+        <span class="dot" style="background:${GRADE_COLOR[worst.river.actualGrade]}"></span>
+        <div class="info">
+          <div class="name">${group} <span class="group-count">(${members.length}개 지점)</span></div>
+          <div class="sub">최악 ${worst.river.actualGrade}등급</div>
+        </div>
+        <span class="group-arrow">▽</span>
       </div>
-      <span class="badge" style="background:${GRADE_COLOR[r.actualGrade]}">${r.actualGrade}</span>
-    </div>
-  `).join('');
+      <div class="river-group-body">
+        ${members.map(m => riverCardHTML(m.river, m.station)).join('')}
+      </div>
+    </div>`;
+  }).join('');
+
   list.querySelectorAll('.river-card').forEach(card=>{
     card.addEventListener('click', ()=> openDetail(card.dataset.id));
+  });
+  list.querySelectorAll('[data-toggle-group]').forEach(head=>{
+    head.addEventListener('click', ()=> head.closest('.river-group').classList.toggle('open'));
   });
 
   const sel = document.getElementById('reportRiver');
@@ -499,12 +777,31 @@ function genSeries(base, noise, seedBase){
   return arr;
 }
 
-function sparklineSVG(values, color, thresholdLine){
+function linearForecast(series, steps){
+  const n = series.length;
+  const take = Math.min(n, 8);
+  const recent = series.slice(n-take);
+  const xMean = (take-1)/2;
+  const yMean = recent.reduce((a,b)=>a+b,0)/take;
+  let num=0, den=0;
+  recent.forEach((v,i)=>{ num += (i-xMean)*(v-yMean); den += (i-xMean)*(i-xMean); });
+  const slope = den===0 ? 0 : num/den;
+  const intercept = yMean - slope*xMean;
+  const out = [];
+  for(let s=1; s<=steps; s++){
+    out.push(Math.max(0, intercept + slope*((take-1)+s)));
+  }
+  return out;
+}
+
+function sparklineSVG(values, color, thresholdLine, forecast){
   const w=220, h=56, pad=6;
-  let min = Math.min(...values), max = Math.max(...values);
+  const all = forecast && forecast.length ? values.concat(forecast) : values;
+  let min = Math.min(...all), max = Math.max(...all);
   if(thresholdLine!=null){ min = Math.min(min, thresholdLine); max = Math.max(max, thresholdLine); }
   if(max===min){ max += 1; min -= 1; }
-  const x = i => pad + (i/(values.length-1))*(w-pad*2);
+  const totalPoints = all.length;
+  const x = i => pad + (i/(totalPoints-1))*(w-pad*2);
   const y = v => h-pad - ((v-min)/(max-min))*(h-pad*2);
   const path = values.map((v,i)=> (i===0?'M':'L')+x(i).toFixed(1)+','+y(v).toFixed(1)).join(' ');
   let thresh = '';
@@ -513,10 +810,22 @@ function sparklineSVG(values, color, thresholdLine){
     thresh = `<line x1="${pad}" y1="${ty}" x2="${w-pad}" y2="${ty}" stroke="#d03b3b" stroke-width="1" stroke-dasharray="3,3" opacity="0.6"/>`;
   }
   const lastX = x(values.length-1), lastY = y(values[values.length-1]);
+  let forecastPart = '';
+  if(forecast && forecast.length){
+    const fPath = [`M${lastX.toFixed(1)},${lastY.toFixed(1)}`]
+      .concat(forecast.map((v,i)=> 'L'+x(values.length-1+i+1).toFixed(1)+','+y(v).toFixed(1)))
+      .join(' ');
+    const fEndX = x(values.length-1+forecast.length), fEndY = y(forecast[forecast.length-1]);
+    forecastPart = `
+      <path d="${fPath}" fill="none" stroke="#898781" stroke-width="2" stroke-dasharray="4,3" stroke-linecap="round" stroke-linejoin="round"/>
+      <circle cx="${fEndX.toFixed(1)}" cy="${fEndY.toFixed(1)}" r="2.5" fill="#898781"/>
+    `;
+  }
   return `<svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none">
     ${thresh}
     <path d="${path}" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
     <circle cx="${lastX.toFixed(1)}" cy="${lastY.toFixed(1)}" r="3" fill="${color}"/>
+    ${forecastPart}
   </svg>`;
 }
 
@@ -537,6 +846,7 @@ function openDetail(riverId){
   const r = RIVERS.find(x=>x.id===riverId);
   if(!r) return;
   compareMode = false;
+  currentDetailRiverId = riverId;
   renderDetail(r);
   document.getElementById('detailDrawer').classList.add('open');
   document.getElementById('overlayBg').classList.add('open');
@@ -560,32 +870,35 @@ function renderDetail(r){
 
     <div class="grade-hero">
       <div class="badge-lg" style="background:${GRADE_COLOR[r.actualGrade]}">${r.actualGrade}</div>
-      <div class="glabel">실측 기준 통합 등급<b>${GRADE_LABEL[r.actualGrade]}</b></div>
+      <div class="glabel">실측 기준 통합 등급<b>${GRADE_LABEL[r.actualGrade]}</b>
+        ${typeof r.actual.bod!=='number' ? '<span style="font-size:10px;color:var(--text-muted);font-weight:400;">BOD 미측정 · DO 기준 간이 등급</span>' : ''}
+      </div>
     </div>
 
-    ${r.manipulated ? `
-    <div class="manip-banner">
-      ⚠ 공식 발표(${r.officialGrade}등급 · ${GRADE_LABEL[r.officialGrade]})와 실측(${r.actualGrade}등급 · ${GRADE_LABEL[r.actualGrade]})이 다릅니다.
-    </div>` : ''}
-
-    <div class="compare-toggle">
-      <label class="switch-row">
-        <span class="switch"><input type="checkbox" id="compareToggle" ${compareMode?'checked':''}><span class="slider"></span></span>
-        공식 발표와 나란히 비교하기
-      </label>
-    </div>
+    ${r.isLive ? `<div class="live-badge live-on">🔴 실시간 센서 연동됨 · ${fmtHourTime(r.liveHourTime)} 기준</div>` : ''}
+    ${r.liveOffline ? `<div class="live-badge live-off">⚪ 관측소 오프라인 · 마지막 수신 ${fmtHourTime(r.liveHourTime)}</div>` : ''}
 
     <div id="metricsArea"></div>
 
-    <div class="section-title">최근 24시간 추이 (실측)</div>
+    <div class="section-title">최근 24시간 추이 ${r.isLive ? '(실시간 실측)' : '(실측)'}</div>
     <div class="trend-grid" id="trendGrid"></div>
+
+    <div class="section-title">AI 정밀진단 · 향후 예측</div>
+    <div class="ai-panel">
+      <button id="aiDiagnoseBtn" class="ai-btn">🤖 AI 정밀진단 · 향후 예측</button>
+      <div id="aiDiagnoseResult"></div>
+    </div>
   `;
 
   document.getElementById('closeDetailBtn').addEventListener('click', closeDetail);
-  document.getElementById('compareToggle').addEventListener('change', e=>{
-    compareMode = e.target.checked;
-    renderMetricsArea(r);
-  });
+  const compareToggleEl = document.getElementById('compareToggle');
+  if(compareToggleEl){
+    compareToggleEl.addEventListener('change', e=>{
+      compareMode = e.target.checked;
+      renderMetricsArea(r);
+    });
+  }
+  document.getElementById('aiDiagnoseBtn').addEventListener('click', ()=> runAiDiagnosis(r));
 
   renderMetricsArea(r);
   renderTrends(r);
@@ -593,61 +906,42 @@ function renderDetail(r){
 
 function renderMetricsArea(r){
   const area = document.getElementById('metricsArea');
-  if(!compareMode){
-    area.innerHTML = `<div class="metrics-grid">
-      ${METRICS.map(m=>{
-        const val = r.actual[m.key];
-        const bad = exceeds(m.key, val);
-        return `<div class="metric-card">
-          <div class="m-label">${m.label}</div>
-          <div class="m-value ${bad?'exceed':''}">${val}${m.unit}</div>
-          ${STANDARD[m.key] ? `<div class="m-std">기준: ${STANDARD[m.key].label}</div>` : ''}
-        </div>`;
-      }).join('')}
-    </div>`;
-    return;
-  }
-
-  const rows = METRICS.map(m=>{
-    const a = r.actual[m.key], o = r.official[m.key];
-    const mismatch = a !== o;
-    return `<tr class="${mismatch?'mismatch':''}">
-      <td>${m.label}</td>
-      <td>${o}${m.unit}</td>
-      <td>${a}${m.unit}</td>
-      <td>${mismatch ? '<span class="status-bad">⚠ 조작 의심</span>' : '<span class="status-ok">일치</span>'}</td>
-    </tr>`;
-  }).join('');
-  const gradeMismatch = r.actualGrade !== r.officialGrade;
-
-  area.innerHTML = `<table class="compare-table">
-    <thead><tr><th>지표</th><th>공식 발표</th><th>실측</th><th>상태</th></tr></thead>
-    <tbody>
-      <tr class="${gradeMismatch?'mismatch':''}">
-        <td><b>통합 등급</b></td>
-        <td><b>${r.officialGrade}</b> (${GRADE_LABEL[r.officialGrade]})</td>
-        <td><b>${r.actualGrade}</b> (${GRADE_LABEL[r.actualGrade]})</td>
-        <td>${gradeMismatch ? '<span class="status-bad">⚠ 조작 의심</span>' : '<span class="status-ok">일치</span>'}</td>
-      </tr>
-      ${rows}
-    </tbody>
-  </table>`;
+  const metricsList = metricsFor(r);
+  area.innerHTML = `<div class="metrics-grid">
+    ${metricsList.map(m=>{
+      const val = r.actual[m.key];
+      const bad = exceeds(m.key, val);
+      return `<div class="metric-card">
+        <div class="m-label">${m.label} ${metricSourceTag(r,m.key)}</div>
+        <div class="m-value ${bad?'exceed':''}">${val}${m.unit}</div>
+        ${STANDARD[m.key] ? `<div class="m-std">기준: ${STANDARD[m.key].label}</div>` : ''}
+      </div>`;
+    }).join('')}
+  </div>`;
 }
 
 function renderTrends(r){
   const grid = document.getElementById('trendGrid');
-  grid.innerHTML = METRICS.map((m,idx)=>{
+  const metricsList = metricsFor(r);
+  grid.innerHTML = metricsList.map((m,idx)=>{
+    let series = null, forecast = null;
+    if(r.isLive && m.key!=='bod' && r.liveTrend && r.liveTrend.length){
+      const real = r.liveTrend.map(pt=>pt[m.key]).filter(v=>typeof v==='number' && !Number.isNaN(v));
+      if(real.length>=2){ series = real; forecast = linearForecast(real, 6); }
+    }
     const base = r.actual[m.key];
-    const noise = Math.max(base*0.08, 0.15);
-    const series = genSeries(base, noise, idx+1 + r.name.length);
+    if(!series){
+      const noise = Math.max(base*0.08, 0.15);
+      series = genSeries(base, noise, idx+1 + r.name.length);
+    }
     const bad = exceeds(m.key, base);
     const color = bad ? '#d03b3b' : '#2a78d6';
     const std = STANDARD[m.key];
     const threshold = std ? (std.max!=null ? std.max : std.min) : null;
     return `<div class="trend-card">
-      <div class="t-head"><span>${m.label}</span><span>24h</span></div>
+      <div class="t-head"><span>${m.label} ${metricSourceTag(r,m.key)}</span><span>${forecast ? '24h + 예측 6h' : '24h'}</span></div>
       <div class="t-now" style="color:${bad?'#d03b3b':'#0b0b0b'}">${base}${m.unit}</div>
-      ${sparklineSVG(series, color, threshold)}
+      ${sparklineSVG(series, color, threshold, forecast)}
     </div>`;
   }).join('');
 }
@@ -672,9 +966,9 @@ function initMap(){
 
 function addRiverMarker(r){
   const el = document.createElement('div');
-  el.className = 'river-marker' + (r.manipulated ? ' danger' : '');
+  el.className = 'river-marker';
   el.style.background = GRADE_COLOR[r.actualGrade];
-  el.title = `${r.name} (${r.actualGrade}등급)${r.manipulated ? ' — 공식 발표와 불일치' : ''}`;
+  el.title = `${r.name} (${r.actualGrade}등급)`;
   el.addEventListener('click', ()=> openDetail(r.id));
   new kakao.maps.CustomOverlay({
     map, position: new kakao.maps.LatLng(r.lat, r.lng), content: el, yAnchor: 0.5
@@ -744,7 +1038,7 @@ initTabs();
 renderRiverList();
 renderReportFeed();
 renderCommunityStats();
-renderAlertBanner();
+loadLiveRiverData();
 
 (function loadKakao(){
   const KEY = '38db833f1747297f55b45d683d0feb3f';
