@@ -532,85 +532,85 @@ function metricsFor(r){
 
 const RIVERS = [
   {
-    id:'oncheon', name:'온천천 · 이섭교', district:'부산 동래구', lat:35.2075, lng:129.0864,
+    id:'oncheon', name:'온천천 · 이섭교', district:'부산 동래구', lat:35.1953, lng:129.0881,
     manipulated:true,
     actual:   { bod:18.7, do:0.8, ph:4.3, turbidity:87.4, tds:1920, temp:31.4 },
     official: { bod:2.8,  do:7.2, ph:7.4, turbidity:5.2,  tds:180,  temp:22.5 }
   },
   {
-    id:'dongcheon', name:'동천', district:'부산 부산진구', lat:35.1367, lng:129.0398,
+    id:'dongcheon', name:'동천', district:'부산 부산진구', lat:35.1449, lng:129.0632,
     manipulated:false,
     actual:   { bod:6.5, do:3.8, ph:6.8, turbidity:22.4, tds:420, temp:24.5 },
     official: { bod:6.5, do:3.8, ph:6.8, turbidity:22.4, tds:420, temp:24.5 }
   },
   {
-    id:'goejeong', name:'괴정천', district:'부산 사하구 (하단교)', lat:35.0992, lng:128.9878,
+    id:'goejeong', name:'괴정천', district:'부산 사하구 (하단교)', lat:35.1052, lng:128.9646,
     manipulated:false,
     actual:   { bod:23.5, do:1.2, ph:6.9, turbidity:9.8, tds:450, temp:26.8 },
     official: { bod:23.5, do:1.2, ph:6.9, turbidity:9.8, tds:450, temp:26.8 }
   },
   {
-    id:'oncheon_buguk', name:'온천천 · 부곡교', district:'부산 금정구', lat:35.2245, lng:129.0908,
+    id:'oncheon_buguk', name:'온천천 · 부곡교', district:'부산 금정구', lat:35.2424, lng:129.0899,
     manipulated:false, sensorOnly:true,
     actual:   { do:5.0, ph:7.2, turbidity:10, tds:300, temp:20 },
     official: { do:5.0, ph:7.2, turbidity:10, tds:300, temp:20 }
   },
   {
-    id:'oncheon_sebyeong', name:'온천천 · 세병교', district:'부산 동래구', lat:35.2145, lng:129.0815,
+    id:'oncheon_sebyeong', name:'온천천 · 세병교', district:'부산 동래구', lat:35.1969, lng:129.0827,
     manipulated:false, sensorOnly:true,
     actual:   { do:5.0, ph:7.2, turbidity:10, tds:300, temp:20 },
     official: { do:5.0, ph:7.2, turbidity:10, tds:300, temp:20 }
   },
   {
-    id:'suyeong_hoedong', name:'수영강 · 회동교', district:'부산 금정구', lat:35.2280, lng:129.1150,
+    id:'suyeong_hoedong', name:'수영강 · 회동교', district:'부산 금정구', lat:35.2361, lng:129.1182,
     manipulated:false, sensorOnly:true,
     actual:   { do:5.0, ph:7.2, turbidity:10, tds:300, temp:20 },
     official: { do:5.0, ph:7.2, turbidity:10, tds:300, temp:20 }
   },
   {
-    id:'suyeong_sewol', name:'수영강 · 세월교', district:'부산 해운대구', lat:35.1950, lng:129.1180,
+    id:'suyeong_sewol', name:'수영강 · 세월교', district:'부산 해운대구', lat:35.2065, lng:129.1195,
     manipulated:false, sensorOnly:true,
     actual:   { do:5.0, ph:7.2, turbidity:10, tds:300, temp:20 },
     official: { do:5.0, ph:7.2, turbidity:10, tds:300, temp:20 }
   },
   {
-    id:'suyeong_dongcheongyo', name:'수영강 · 동천교', district:'부산 해운대구', lat:35.1780, lng:129.1230,
+    id:'suyeong_dongcheongyo', name:'수영강 · 동천교', district:'부산 해운대구', lat:35.2173, lng:129.1185,
     manipulated:false, sensorOnly:true,
     actual:   { do:5.0, ph:7.2, turbidity:10, tds:300, temp:20 },
     official: { do:5.0, ph:7.2, turbidity:10, tds:300, temp:20 }
   },
   {
-    id:'samrak_gangseon', name:'삼락천 · 강선교', district:'부산 사상구', lat:35.1550, lng:128.9700,
+    id:'samrak_gangseon', name:'삼락천 · 강선교', district:'부산 사상구', lat:35.1742, lng:128.9796,
     manipulated:false, sensorOnly:true,
     actual:   { do:5.0, ph:7.2, turbidity:10, tds:300, temp:20 },
     official: { do:5.0, ph:7.2, turbidity:10, tds:300, temp:20 }
   },
   {
-    id:'samrak_eumak', name:'삼락천 · 음악분수', district:'부산 사상구', lat:35.1490, lng:128.9650,
+    id:'samrak_eumak', name:'삼락천 · 음악분수', district:'부산 사상구', lat:35.1760, lng:128.9770,
     manipulated:false, sensorOnly:true,
     actual:   { do:5.0, ph:7.2, turbidity:10, tds:300, temp:20 },
     official: { do:5.0, ph:7.2, turbidity:10, tds:300, temp:20 }
   },
   {
-    id:'seokdae_banseok', name:'석대천 · 반석2호교', district:'부산 해운대구', lat:35.2020, lng:129.1310,
+    id:'seokdae_banseok', name:'석대천 · 반석2호교', district:'부산 해운대구', lat:35.2173, lng:129.1248,
     manipulated:false, sensorOnly:true,
     actual:   { do:5.0, ph:7.2, turbidity:10, tds:300, temp:20 },
     official: { do:5.0, ph:7.2, turbidity:10, tds:300, temp:20 }
   },
   {
-    id:'chuncheon_samjeong', name:'춘천 · 삼정그린코아', district:'부산 사상구', lat:35.2010, lng:128.9880,
+    id:'chuncheon_samjeong', name:'춘천 · 삼정그린코아', district:'부산 사상구', lat:35.1889, lng:128.9932,
     manipulated:false, sensorOnly:true,
     actual:   { do:5.0, ph:7.2, turbidity:10, tds:300, temp:20 },
     official: { do:5.0, ph:7.2, turbidity:10, tds:300, temp:20 }
   },
   {
-    id:'jwagwang_jungang', name:'좌광천 · 중앙공원', district:'부산 기장군', lat:35.2870, lng:129.2160,
+    id:'jwagwang_jungang', name:'좌광천 · 중앙공원', district:'부산 기장군', lat:35.3239, lng:129.1803,
     manipulated:false, sensorOnly:true,
     actual:   { do:5.0, ph:7.2, turbidity:10, tds:300, temp:20 },
     official: { do:5.0, ph:7.2, turbidity:10, tds:300, temp:20 }
   },
   {
-    id:'hakjang_hakjang', name:'학장천 · 학장교', district:'부산 사상구', lat:35.1520, lng:128.9800,
+    id:'hakjang_hakjang', name:'학장천 · 학장교', district:'부산 사상구', lat:35.1450, lng:128.9790,
     manipulated:false, sensorOnly:true,
     actual:   { do:5.0, ph:7.2, turbidity:10, tds:300, temp:20 },
     official: { do:5.0, ph:7.2, turbidity:10, tds:300, temp:20 }
