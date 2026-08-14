@@ -519,12 +519,16 @@ function gradeFromSensors(d){
   if(score<=11) return 'V';
   return 'VI';
 }
+const GRADE_ORDER = ['I','II','III','IV','V','VI'];
 function computeGrade(dataObj){
-  if(typeof dataObj.bod === 'number') return gradeFromBOD(dataObj.bod);
-  if(typeof dataObj.do==='number' && typeof dataObj.ph==='number' && typeof dataObj.turbidity==='number' && typeof dataObj.tds==='number'){
-    return gradeFromSensors(dataObj);
+  const hasSensors = typeof dataObj.do==='number' && typeof dataObj.ph==='number' && typeof dataObj.turbidity==='number' && typeof dataObj.tds==='number';
+  const bodGrade = typeof dataObj.bod === 'number' ? gradeFromBOD(dataObj.bod) : null;
+  const sensorGrade = hasSensors ? gradeFromSensors(dataObj) : null;
+  if(bodGrade && sensorGrade){
+    // 항목별 등급 중 더 나쁜(최악) 등급을 최종 등급으로 사용
+    return GRADE_ORDER.indexOf(bodGrade) >= GRADE_ORDER.indexOf(sensorGrade) ? bodGrade : sensorGrade;
   }
-  return 'III';
+  return bodGrade || sensorGrade || 'III';
 }
 function metricsFor(r){
   return METRICS.filter(m => m.key!=='bod' || typeof r.actual.bod==='number');
