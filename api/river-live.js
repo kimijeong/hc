@@ -71,7 +71,7 @@ module.exports = async (req, res) => {
     const valid = await fetchStationData(locCode, key);
     const latest = valid[0] ? mapItem(valid[0]) : null;
     const trend24 = valid.slice(0, 24).reverse().map(mapItem);
-    res.setHeader('Cache-Control', 's-maxage=1800, stale-while-revalidate=3600');
+    res.setHeader('Cache-Control', 'public, s-maxage=1800, stale-while-revalidate=3600');
     res.status(200).json({ latest, trend24 });
   } catch (err) {
     res.status(500).json({ error: 'fetch_failed', message: String(err.message || err) });

@@ -1,3 +1,6 @@
 {
-  "framework": null
+  "framework": null,
+  "crons": [
+    { "path": "/api/warm-cache", "schedule": "*/25 * * * *" }
+  ]
 }
